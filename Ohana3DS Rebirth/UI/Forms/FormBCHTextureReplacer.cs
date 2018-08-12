@@ -12,6 +12,7 @@ namespace Ohana3DS_Rebirth
     {
         private string CurrentFilename;
 
+        // TODO: Refactor out file processing code and structures...
         private struct LoadedTexture
         {
             public bool modified;

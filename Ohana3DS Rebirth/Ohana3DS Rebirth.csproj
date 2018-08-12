@@ -68,22 +68,22 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="FormBCHTextureReplacer.cs">
+    <Compile Include="UI\Forms\FormBCHTextureReplacer.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="FormBCHTextureReplacer.Designer.cs">
+    <Compile Include="UI\Forms\FormBCHTextureReplacer.Designer.cs">
       <DependentUpon>FormBCHTextureReplacer.cs</DependentUpon>
     </Compile>
-    <Compile Include="FormMain.cs">
+    <Compile Include="UI\Forms\FormMain.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="FormMain.Designer.cs">
+    <Compile Include="UI\Forms\FormMain.Designer.cs">
       <DependentUpon>FormMain.cs</DependentUpon>
     </Compile>
-    <Compile Include="FormSm4shModelCreator.cs">
+    <Compile Include="UI\Forms\FormSm4shModelCreator.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="FormSm4shModelCreator.Designer.cs">
+    <Compile Include="UI\Forms\FormSm4shModelCreator.Designer.cs">
       <DependentUpon>FormSm4shModelCreator.cs</DependentUpon>
     </Compile>
     <Compile Include="FrmMain.cs">
@@ -295,13 +295,33 @@
     <Compile Include="Tools\OSm4shModelCreator.Designer.cs">
       <DependentUpon>OSm4shModelCreator.cs</DependentUpon>
     </Compile>
-    <EmbeddedResource Include="FormBCHTextureReplacer.resx">
+    <Compile Include="UI\Panels\IFileRenderPanel.cs" />
+    <Compile Include="UI\Panels\IRenderEnginePanel.cs" />
+    <Compile Include="UI\Panels\ModelsPanel.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="UI\Panels\ModelsPanel.Designer.cs">
+      <DependentUpon>ModelsPanel.cs</DependentUpon>
+    </Compile>
+    <Compile Include="UI\Panels\TexturesPanel.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="UI\Panels\TexturesPanel.Designer.cs">
+      <DependentUpon>TexturesPanel.cs</DependentUpon>
+    </Compile>
+    <Compile Include="UI\Panels\ViewportPanel.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="UI\Panels\ViewportPanel.Designer.cs">
+      <DependentUpon>ViewportPanel.cs</DependentUpon>
+    </Compile>
+    <EmbeddedResource Include="UI\Forms\FormBCHTextureReplacer.resx">
       <DependentUpon>FormBCHTextureReplacer.cs</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="FormMain.resx">
+    <EmbeddedResource Include="UI\Forms\FormMain.resx">
       <DependentUpon>FormMain.cs</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="FormSm4shModelCreator.resx">
+    <EmbeddedResource Include="UI\Forms\FormSm4shModelCreator.resx">
       <DependentUpon>FormSm4shModelCreator.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="FrmMain.resx">
@@ -367,6 +387,15 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Tools\OSm4shModelCreator.resx">
       <DependentUpon>OSm4shModelCreator.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\Panels\ModelsPanel.resx">
+      <DependentUpon>ModelsPanel.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\Panels\TexturesPanel.resx">
+      <DependentUpon>TexturesPanel.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\Panels\ViewportPanel.resx">
+      <DependentUpon>ViewportPanel.cs</DependentUpon>
     </EmbeddedResource>
     <None Include="app.config">
       <SubType>Designer</SubType>

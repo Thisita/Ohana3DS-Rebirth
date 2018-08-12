@@ -58,6 +58,7 @@ namespace Ohana3DS_Rebirth
 
         private bool Create(string inputFilename, string outputFilename)
         {
+            // TODO: Refactor out file processing code
             if (!File.Exists(inputFilename)) return false;
 
             RenderBase.OModelGroup models;
