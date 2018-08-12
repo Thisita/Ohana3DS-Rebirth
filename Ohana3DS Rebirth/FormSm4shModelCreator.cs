@@ -1,67 +1,72 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Windows.Forms;
-
-using Ohana3DS_Rebirth.Ohana;
+﻿using Ohana3DS_Rebirth.Ohana;
 using Ohana3DS_Rebirth.Ohana.Models;
 using Ohana3DS_Rebirth.Ohana.Models.GenericFormats;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
 
-namespace Ohana3DS_Rebirth.Tools
+namespace Ohana3DS_Rebirth
 {
-    public partial class OSm4shModelCreator : OForm
+    public partial class FormSm4shModelCreator : Form
     {
-        Form parentForm;
-
-        public OSm4shModelCreator(Form parent)
+        public FormSm4shModelCreator()
         {
             InitializeComponent();
-            parentForm = parent;
         }
 
-        private void OTextureExportForm_KeyDown(object sender, KeyEventArgs e)
+        private void InputOpenFileButton_Click(object sender, EventArgs e)
         {
-            switch (e.KeyCode)
+            using (OpenFileDialog ofd = new OpenFileDialog() { Filter = "Supported formats|*.obj;*.smd" })
             {
-                case Keys.Enter: create(); Close(); break;
-                case Keys.Escape: Close(); break;
+                if (ofd.ShowDialog() == DialogResult.OK)
+                {
+                    InputFileTextBox.Text = ofd.FileName;
+                }
             }
         }
 
-        private void BtnOpenInputModel_Click(object sender, EventArgs e)
+        private void OutputFileOpenButton_Click(object sender, EventArgs e)
         {
-            using (OpenFileDialog openDlg = new OpenFileDialog())
+            using (OpenFileDialog ofd = new OpenFileDialog() { Filter = "Sm4sh model|*.mbn" })
             {
-                openDlg.Filter = "Supported formats|*.obj;*.smd";
-                if (openDlg.ShowDialog() == DialogResult.OK) TxtInModel.Text = openDlg.FileName;
+                if (ofd.ShowDialog() == DialogResult.OK)
+                {
+                    OutputFileTextBox.Text = ofd.FileName;
+                }
             }
         }
 
-        private void BtnSaveOutputModel_Click(object sender, EventArgs e)
+        private void CreateButton_Click(object sender, EventArgs e)
         {
-            using (SaveFileDialog saveDlg = new SaveFileDialog())
+            if(Create(InputFileTextBox.Text, OutputFileTextBox.Text))
             {
-                saveDlg.Filter = "Sm4sh model|*.mbn";
-                if (saveDlg.ShowDialog() == DialogResult.OK) TxtOutModel.Text = saveDlg.FileName;
+                MessageBox.Show(this, "Done!", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 
-        private void BtnCreate_Click(object sender, EventArgs e)
+        private void CloseButton_Click(object sender, EventArgs e)
         {
-            if (create()) MessageBox.Show("Done!", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            Close();
         }
 
-        private bool create()
+        private bool Create(string inputFilename, string outputFilename)
         {
-            if (!File.Exists(TxtInModel.Text)) return false;
+            if (!File.Exists(inputFilename)) return false;
 
             RenderBase.OModelGroup models;
-            switch (Path.GetExtension(TxtInModel.Text).ToLower())
+            switch (Path.GetExtension(inputFilename).ToLower())
             {
-                case ".obj": models = OBJ.import(TxtInModel.Text); break;
-                case ".smd": models = SMD.import(TxtInModel.Text); break;
+                case ".obj": models = OBJ.import(inputFilename); break;
+                case ".smd": models = SMD.import(inputFilename); break;
                 default:
-                    MessageBox.Show("Unsupported model format!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show(this, "Unsupported model format!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return false;
             }
 
@@ -77,10 +82,10 @@ namespace Ohana3DS_Rebirth.Tools
                 writer.Write((uint)0);
                 writer.Write(model.mesh.Count);
 
-                List<mesh> meshes = new List<mesh>();
-                foreach (RenderBase.OMesh mesh in model.mesh) meshes.Add(createMesh(mesh));
+                List<Mesh> meshes = new List<Mesh>();
+                foreach (RenderBase.OMesh mesh in model.mesh) meshes.Add(CreateMesh(mesh));
 
-                foreach (mesh m in meshes)
+                foreach (Mesh m in meshes)
                 {
                     //Face
                     writer.Write((uint)1); //Faces count
@@ -90,7 +95,7 @@ namespace Ohana3DS_Rebirth.Tools
 
                     //Vertex
                     writer.Write(m.descriptor.attributes.Count);
-                    foreach (attributeDescriptor att in m.descriptor.attributes)
+                    foreach (AttributeDescriptor att in m.descriptor.attributes)
                     {
                         writer.Write(att.type);
                         writer.Write(att.format);
@@ -99,34 +104,34 @@ namespace Ohana3DS_Rebirth.Tools
                     writer.Write(m.vertexBuffer.Length);
                 }
 
-                align(output);
-                foreach (mesh m in meshes)
+                Align(output);
+                foreach (Mesh m in meshes)
                 {
                     writer.Write(m.vertexBuffer);
-                    align(output);
+                    Align(output);
 
                     writer.Write(m.indexBuffer);
-                    align(output);
+                    Align(output);
                 }
 
-                File.WriteAllBytes(TxtOutModel.Text, output.ToArray());
+                File.WriteAllBytes(outputFilename, output.ToArray());
             }
 
             return true;
         }
 
-        private void align(Stream data)
+        private void Align(Stream data)
         {
             while ((data.Position & 0x1f) != 0) data.WriteByte(0xff);
         }
 
-        private class attributeDescriptor
+        private class AttributeDescriptor
         {
             public uint type;
             public uint format;
             public float scale;
 
-            public attributeDescriptor(uint _type, uint _format, float _scale)
+            public AttributeDescriptor(uint _type, uint _format, float _scale)
             {
                 type = _type;
                 format = _format;
@@ -134,31 +139,32 @@ namespace Ohana3DS_Rebirth.Tools
             }
         }
 
-        private struct meshDescriptor
+        private struct MeshDescriptor
         {
             public List<uint> nodes;
-            public List<attributeDescriptor> attributes;
+            public List<AttributeDescriptor> attributes;
         }
 
-        private struct mesh
+        private struct Mesh
         {
-            public meshDescriptor descriptor;
+            public MeshDescriptor descriptor;
             public byte[] vertexBuffer;
             public byte[] indexBuffer;
         }
 
-        private mesh createMesh(RenderBase.OMesh input)
+        private Mesh CreateMesh(RenderBase.OMesh input)
         {
-            mesh output;
+            Mesh output;
 
             output.descriptor.nodes = new List<uint>();
-            output.descriptor.attributes = new List<attributeDescriptor>();
-
-            output.descriptor.attributes.Add(new attributeDescriptor(0, 0, 1f)); //Position
-            if (input.hasNormal) output.descriptor.attributes.Add(new attributeDescriptor(1, 0, 1f));
-            if (input.texUVCount > 0) output.descriptor.attributes.Add(new attributeDescriptor(3, 0, 1f));
-            if (input.hasNode) output.descriptor.attributes.Add(new attributeDescriptor(5, 1, 1f));
-            if (input.hasWeight) output.descriptor.attributes.Add(new attributeDescriptor(6, 1, 0.00392156862f));
+            output.descriptor.attributes = new List<AttributeDescriptor>
+            {
+                new AttributeDescriptor(0, 0, 1f) //Position
+            };
+            if (input.hasNormal) output.descriptor.attributes.Add(new AttributeDescriptor(1, 0, 1f));
+            if (input.texUVCount > 0) output.descriptor.attributes.Add(new AttributeDescriptor(3, 0, 1f));
+            if (input.hasNode) output.descriptor.attributes.Add(new AttributeDescriptor(5, 1, 1f));
+            if (input.hasWeight) output.descriptor.attributes.Add(new AttributeDescriptor(6, 1, 0.00392156862f));
 
             MeshUtils.optimizedMesh optimized = MeshUtils.optimizeMesh(input);
             using (MemoryStream vertexStream = new MemoryStream())
@@ -227,11 +233,6 @@ namespace Ohana3DS_Rebirth.Tools
             }
 
             return output;
-        }
-
-        private void BtnCancel_Click(object sender, EventArgs e)
-        {
-            Close();
         }
     }
 }

@@ -1,21 +1,18 @@
-﻿using System;
+﻿using Ohana3DS_Rebirth.Ohana;
+using Ohana3DS_Rebirth.Ohana.Models.PICA200;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
 
-using Ohana3DS_Rebirth.GUI;
-using Ohana3DS_Rebirth.Ohana;
-using Ohana3DS_Rebirth.Ohana.Models.PICA200;
-
-namespace Ohana3DS_Rebirth.Tools
+namespace Ohana3DS_Rebirth
 {
-    public partial class OBCHTextureReplacer : OForm
+    public partial class FormBCHTextureReplacer : Form
     {
-        string currentFile;
-        Form parentForm;
+        private string CurrentFilename;
 
-        private struct loadedTexture
+        private struct LoadedTexture
         {
             public bool modified;
             public uint gpuCommandsOffset;
@@ -25,7 +22,7 @@ namespace Ohana3DS_Rebirth.Tools
             public RenderBase.OTexture texture;
         }
 
-        private struct loadedMaterial
+        private struct LoadedMaterial
         {
             public string texture0;
             public string texture1;
@@ -34,98 +31,150 @@ namespace Ohana3DS_Rebirth.Tools
             public uint gpuCommandsWordCount;
         }
 
-        private class loadedBCH
+        private class LoadedBCH
         {
             public uint mainHeaderOffset;
             public uint gpuCommandsOffset;
             public uint dataOffset;
             public uint relocationTableOffset;
             public uint relocationTableLength;
-            public List<loadedTexture> textures;
-            public List<loadedMaterial> materials;
+            public List<LoadedTexture> textures;
+            public List<LoadedMaterial> materials;
 
-            public loadedBCH()
+            public LoadedBCH()
             {
-                textures = new List<loadedTexture>();
-                materials = new List<loadedMaterial>();
+                textures = new List<LoadedTexture>();
+                materials = new List<LoadedMaterial>();
             }
         }
 
-        loadedBCH bch;
+        LoadedBCH bch;
 
-        public OBCHTextureReplacer(Form parent)
+        public FormBCHTextureReplacer()
         {
             InitializeComponent();
-            parentForm = parent;
-            TopMenu.Renderer = new OMenuStrip();
         }
 
-        private void OBCHTextureReplacer_KeyDown(object sender, KeyEventArgs e)
+        private void OpenToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            switch (e.KeyCode)
+            using (OpenFileDialog ofd = new OpenFileDialog() { Filter = "All supported files|*bch", CheckFileExists = true })
             {
-                case Keys.O: open(); break;
-                case Keys.S: if (bch != null) save(); break;
-                case Keys.P: saveAndPreview(); break;
-            }
-        }
-
-        private void MenuOpen_Click(object sender, EventArgs e)
-        {
-            open();
-        }
-
-        private void MenuSave_Click(object sender, EventArgs e)
-        {
-            if (bch != null) save();
-        }
-
-        private void MenuSaveAndPreview_Click(object sender, EventArgs e)
-        {
-            saveAndPreview();
-        }
-
-        private void MenuExit_Click(object sender, EventArgs e)
-        {
-            Close();
-        }
-
-        private void open()
-        {
-            using (OpenFileDialog openDlg = new OpenFileDialog())
-            {
-                openDlg.Filter = "All supported files|*.bch";
-
-                if (openDlg.ShowDialog() == DialogResult.OK && File.Exists(openDlg.FileName))
+                if (ofd.ShowDialog() == DialogResult.OK)
                 {
-                    if (!open(openDlg.FileName))
-                        MessageBox.Show(
-                            "Unsupported file format!",
-                            "Error",
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Error);
+                    if (!Open(ofd.FileName))
+                    {
+                        MessageBox.Show(this, "Unsupported file format!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
                 }
             }
         }
 
-        private void saveAndPreview()
+        private void SaveToolStripMenuItem_Click(object sender, EventArgs e) => Save();
+
+        private void SaveAndPreviewToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            if (bch != null)
+            if(bch != null)
             {
-                save();
-                ((FormMain)parentForm).OpenFile(currentFile);
+                Save();
+                ((FormMain)Owner).OpenFile(CurrentFilename);
             }
         }
 
-        private bool open(string fileName)
+        private void CloseToolStripMenuItem_Click(object sender, EventArgs e) => Close();
+
+        private void ExportButton_Click(object sender, EventArgs e)
         {
-            using (FileStream data = new FileStream(fileName, FileMode.Open))
+            if (TextureList.SelectedIndex == -1) return;
+
+            using (SaveFileDialog saveDlg = new SaveFileDialog())
+            {
+                saveDlg.Filter = "Image|*.png";
+                if (saveDlg.ShowDialog() == DialogResult.OK)
+                {
+                    bch.textures[TextureList.SelectedIndex].texture.texture.Save(saveDlg.FileName);
+                }
+            }
+        }
+
+        private void ExportAllButton_Click(object sender, EventArgs e)
+        {
+            if (TextureList.SelectedIndex == -1) return;
+
+            using (FolderBrowserDialog browserDlg = new FolderBrowserDialog())
+            {
+                if (browserDlg.ShowDialog() == DialogResult.OK)
+                {
+                    foreach (LoadedTexture tex in bch.textures)
+                    {
+                        string outFile = Path.Combine(browserDlg.SelectedPath, tex.texture.name);
+                        tex.texture.texture.Save(outFile + ".png");
+                    }
+                }
+            }
+        }
+
+        private void ReplaceButton_Click(object sender, EventArgs e)
+        {
+            if (TextureList.SelectedIndex == -1) return;
+
+            using (OpenFileDialog openDlg = new OpenFileDialog())
+            {
+                openDlg.Filter = "Image|*.png";
+                if (openDlg.ShowDialog() == DialogResult.OK)
+                {
+                    LoadedTexture tex = bch.textures[TextureList.SelectedIndex];
+                    bch.textures.RemoveAt(TextureList.SelectedIndex);
+                    Bitmap newTexture = new Bitmap(openDlg.FileName);
+                    tex.texture.texture = newTexture;
+                    tex.modified = true;
+                    bch.textures.Insert(TextureList.SelectedIndex, tex);
+                    PreviewPictureBox.Image = newTexture;
+                }
+            }
+        }
+
+        private void ReplaceAllButton_Click(object sender, EventArgs e)
+        {
+            if (bch == null) return;
+
+            using (FolderBrowserDialog browserDlg = new FolderBrowserDialog())
+            {
+                if (browserDlg.ShowDialog() == DialogResult.OK)
+                {
+                    string[] files = Directory.GetFiles(browserDlg.SelectedPath);
+                    for (int i = 0; i < bch.textures.Count; i++)
+                    {
+                        LoadedTexture tex = bch.textures[i];
+
+                        foreach (string file in files)
+                        {
+                            string name = Path.GetFileNameWithoutExtension(file);
+
+                            if (string.Compare(name, tex.texture.name, StringComparison.InvariantCultureIgnoreCase) == 0)
+                            {
+                                LoadedTexture newTex = tex;
+                                bch.textures.RemoveAt(i);
+                                Bitmap newTexture = new Bitmap(file);
+                                tex.texture.texture = newTexture;
+                                tex.modified = true;
+                                bch.textures.Insert(i, tex);
+                                if (TextureList.SelectedIndex == i) PreviewPictureBox.Image = newTexture;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private bool Open(string filename)
+        {
+            using (FileStream data = new FileStream(filename, FileMode.Open))
             {
                 BinaryReader input = new BinaryReader(data);
 
                 string magic = IOUtils.readString(input, 0);
                 if (magic != "BCH") return false;
-                currentFile = fileName;
+                CurrentFilename = filename;
                 data.Seek(4, SeekOrigin.Current);
                 byte backwardCompatibility = input.ReadByte();
                 byte forwardCompatibility = input.ReadByte();
@@ -153,7 +202,7 @@ namespace Ohana3DS_Rebirth.Tools
                 uint texturesPointerTableOffset = input.ReadUInt32() + mainHeaderOffset;
                 uint texturesPointerTableEntries = input.ReadUInt32();
 
-                bch = new loadedBCH();
+                bch = new LoadedBCH();
 
                 //Textures
                 for (int index = 0; index < texturesPointerTableEntries; index++)
@@ -161,7 +210,7 @@ namespace Ohana3DS_Rebirth.Tools
                     data.Seek(texturesPointerTableOffset + (index * 4), SeekOrigin.Begin);
                     data.Seek(input.ReadUInt32() + mainHeaderOffset, SeekOrigin.Begin);
 
-                    loadedTexture tex;
+                    LoadedTexture tex;
                     tex.modified = false;
                     tex.gpuCommandsOffset = input.ReadUInt32() + gpuCommandsOffset;
                     tex.gpuCommandsWordCount = input.ReadUInt32();
@@ -227,7 +276,7 @@ namespace Ohana3DS_Rebirth.Tools
                         else
                             data.Seek(materialsTableOffset + (index * 0x2c), SeekOrigin.Begin);
 
-                        loadedMaterial mat;
+                        LoadedMaterial mat;
 
                         data.Seek(0x10, SeekOrigin.Current);
                         mat.gpuCommandsOffset = input.ReadUInt32() + gpuCommandsOffset;
@@ -257,136 +306,41 @@ namespace Ohana3DS_Rebirth.Tools
                 bch.relocationTableLength = relocationTableLength;
             }
 
-            updateTexturesList();
+            UpdateTexturesList();
             return true;
         }
 
-        private void updateTexturesList()
+        private void Save()
         {
-            TextureList.flush();
-            PicPreview.Image = null;
-            foreach (loadedTexture tex in bch.textures) TextureList.addItem(tex.texture.name);
-            TextureList.Refresh();
-        }
-
-        private void TextureList_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            if (TextureList.SelectedIndex == -1) return;
-
-            PicPreview.Image = bch.textures[TextureList.SelectedIndex].texture.texture;
-        }
-
-        private void BtnExport_Click(object sender, EventArgs e)
-        {
-            if (TextureList.SelectedIndex == -1) return;
-
-            using (SaveFileDialog saveDlg = new SaveFileDialog())
+            if(bch == null)
             {
-                saveDlg.Filter = "Image|*.png";
-                if (saveDlg.ShowDialog() == DialogResult.OK)
-                {
-                    bch.textures[TextureList.SelectedIndex].texture.texture.Save(saveDlg.FileName);
-                }
+                return;
             }
-        }
-
-        private void BtnExportAll_Click(object sender, EventArgs e)
-        {
-            if (TextureList.SelectedIndex == -1) return;
-
-            using (FolderBrowserDialog browserDlg = new FolderBrowserDialog())
-            {
-                if (browserDlg.ShowDialog() == DialogResult.OK)
-                {
-                    foreach (loadedTexture tex in bch.textures)
-                    {
-                        string outFile = Path.Combine(browserDlg.SelectedPath, tex.texture.name);
-                        tex.texture.texture.Save(outFile + ".png");
-                    }
-                }
-            }
-        }
-
-        private void BtnReplace_Click(object sender, EventArgs e)
-        {
-            if (TextureList.SelectedIndex == -1) return;
-
-            using (OpenFileDialog openDlg = new OpenFileDialog())
-            {
-                openDlg.Filter = "Image|*.png";
-                if (openDlg.ShowDialog() == DialogResult.OK)
-                {
-                    loadedTexture tex = bch.textures[TextureList.SelectedIndex];
-                    bch.textures.RemoveAt(TextureList.SelectedIndex);
-                    Bitmap newTexture = new Bitmap(openDlg.FileName);
-                    tex.texture.texture = newTexture;
-                    tex.modified = true;
-                    bch.textures.Insert(TextureList.SelectedIndex, tex);
-                    PicPreview.Image = newTexture;
-                }
-            }
-        }
-
-        private void BtnReplaceAll_Click(object sender, EventArgs e)
-        {
-            if (bch == null) return;
-
-            using (FolderBrowserDialog browserDlg = new FolderBrowserDialog())
-            {
-                if (browserDlg.ShowDialog() == DialogResult.OK)
-                {
-                    string[] files = Directory.GetFiles(browserDlg.SelectedPath);
-                    for (int i = 0; i < bch.textures.Count; i++)
-                    {
-                        loadedTexture tex = bch.textures[i];
-
-                        foreach (string file in files)
-                        {
-                            string name = Path.GetFileNameWithoutExtension(file);
-
-                            if (string.Compare(name, tex.texture.name, StringComparison.InvariantCultureIgnoreCase) == 0)
-                            {
-                                loadedTexture newTex = tex;
-                                bch.textures.RemoveAt(i);
-                                Bitmap newTexture = new Bitmap(file);
-                                tex.texture.texture = newTexture;
-                                tex.modified = true;
-                                bch.textures.Insert(i, tex);
-                                if (TextureList.SelectedIndex == i) PicPreview.Image = newTexture;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        private void save()
-        {
-            using (FileStream data = new FileStream(currentFile, FileMode.Open))
+            using (FileStream data = new FileStream(CurrentFilename, FileMode.Open))
             {
                 BinaryReader input = new BinaryReader(data);
                 BinaryWriter output = new BinaryWriter(data);
 
                 for (int i = 0; i < bch.textures.Count; i++)
                 {
-                    loadedTexture tex = bch.textures[i];
+                    LoadedTexture tex = bch.textures[i];
 
                     if (tex.modified)
                     {
-                        byte[] buffer = align(TextureCodec.encode(tex.texture.texture, RenderBase.OTextureFormat.rgba8));
+                        byte[] buffer = Align(TextureCodec.encode(tex.texture.texture, RenderBase.OTextureFormat.rgba8));
                         int diff = buffer.Length - tex.length;
 
-                        replaceData(data, tex.offset, tex.length, buffer);
+                        ReplaceData(data, tex.offset, tex.length, buffer);
 
                         //Update offsets of next textures
                         tex.length = buffer.Length;
                         tex.modified = false;
-                        updateTexture(i, tex);
+                        UpdateTexture(i, tex);
                         for (int j = i; j < bch.textures.Count; j++)
                         {
-                            loadedTexture next = bch.textures[j];
+                            LoadedTexture next = bch.textures[j];
                             next.offset = (uint)(next.offset + diff);
-                            updateTexture(j, next);
+                            UpdateTexture(j, next);
                         }
 
                         //Update all addresses poiting after the replaced data
@@ -428,18 +382,18 @@ namespace Ohana3DS_Rebirth.Tools
                                 case 0xf008e:
                                 case 0xf0096:
                                 case 0xf009e:
-                                    replaceCommand(data, output, 0); //Set texture format to 0 = RGBA8888
+                                    ReplaceCommand(data, output, 0); //Set texture format to 0 = RGBA8888
                                     break;
                                 case 0xf0082:
                                 case 0xf0092:
                                 case 0xf009a:
-                                    replaceCommand(data, output, newSize); //Set new texture size
+                                    ReplaceCommand(data, output, newSize); //Set new texture size
                                     break;
                             }
                         }
 
                         //Update material texture format
-                        foreach (loadedMaterial mat in bch.materials)
+                        foreach (LoadedMaterial mat in bch.materials)
                         {
                             data.Seek(mat.gpuCommandsOffset, SeekOrigin.Begin);
                             for (int index = 0; index < mat.gpuCommandsWordCount; index++)
@@ -448,9 +402,9 @@ namespace Ohana3DS_Rebirth.Tools
 
                                 switch (command)
                                 {
-                                    case 0xf008e: if (mat.texture0 == tex.texture.name || mat.texture0 == "") replaceCommand(data, output, 0); break;
-                                    case 0xf0096: if (mat.texture1 == tex.texture.name || mat.texture1 == "") replaceCommand(data, output, 0); break;
-                                    case 0xf009e: if (mat.texture2 == tex.texture.name || mat.texture2 == "") replaceCommand(data, output, 0); break;
+                                    case 0xf008e: if (mat.texture0 == tex.texture.name || mat.texture0 == "") ReplaceCommand(data, output, 0); break;
+                                    case 0xf0096: if (mat.texture1 == tex.texture.name || mat.texture1 == "") ReplaceCommand(data, output, 0); break;
+                                    case 0xf009e: if (mat.texture2 == tex.texture.name || mat.texture2 == "") ReplaceCommand(data, output, 0); break;
                                 }
                             }
                         }
@@ -462,20 +416,20 @@ namespace Ohana3DS_Rebirth.Tools
 
                         //Update Data Extended and Relocation Table offsets
                         data.Seek(18, SeekOrigin.Current);
-                        if (backwardCompatibility > 0x20) updateAddress(data, input, output, diff);
-                        updateAddress(data, input, output, diff);
+                        if (backwardCompatibility > 0x20) UpdateAddress(data, input, output, diff);
+                        UpdateAddress(data, input, output, diff);
 
                         //Update data length
                         data.Seek(12, SeekOrigin.Current);
-                        updateAddress(data, input, output, diff);
+                        UpdateAddress(data, input, output, diff);
                     }
                 }
             }
 
-            MessageBox.Show("Done!", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "Done!", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
-        private byte[] align(byte[] input)
+        private byte[] Align(byte[] input)
         {
             int length = input.Length;
             while ((length & 0x7f) > 0) length++;
@@ -484,14 +438,14 @@ namespace Ohana3DS_Rebirth.Tools
             return output;
         }
 
-        private void replaceCommand(Stream data, BinaryWriter output, uint newVal)
+        private void ReplaceCommand(Stream data, BinaryWriter output, uint newVal)
         {
             data.Seek(-8, SeekOrigin.Current);
             output.Write(newVal);
             data.Seek(4, SeekOrigin.Current);
         }
 
-        private void replaceData(Stream data, uint offset, int length, byte[] newData)
+        private void ReplaceData(Stream data, uint offset, int length, byte[] newData)
         {
             data.Seek(offset + length, SeekOrigin.Begin);
             byte[] after = new byte[data.Length - data.Position];
@@ -502,7 +456,7 @@ namespace Ohana3DS_Rebirth.Tools
             data.Write(after, 0, after.Length);
         }
 
-        private void updateAddress(Stream data, BinaryReader input, BinaryWriter output, int diff)
+        private void UpdateAddress(Stream data, BinaryReader input, BinaryWriter output, int diff)
         {
             uint offset = input.ReadUInt32();
             offset = (uint)(offset + diff);
@@ -510,10 +464,33 @@ namespace Ohana3DS_Rebirth.Tools
             output.Write(offset);
         }
 
-        private void updateTexture(int index, loadedTexture newTex)
+        private void UpdateTexture(int index, LoadedTexture newTex)
         {
             bch.textures.RemoveAt(index);
             bch.textures.Insert(index, newTex);
+        }
+
+        private void UpdateTexturesList()
+        {
+            TextureList.Items.Clear();
+            PreviewPictureBox.Image = null;
+            foreach (LoadedTexture tex in bch.textures)
+            {
+                TextureList.Items.Add(tex.texture.name);
+            }
+
+            TextureList.Refresh();
+        }
+
+        private void TextureList_SelectedIndexChanged(object sender, EventArgs e)
+        {
+
+            if (TextureList.SelectedIndex == -1)
+            {
+                return;
+            }
+
+            PreviewPictureBox.Image = bch.textures[TextureList.SelectedIndex].texture.texture;
         }
     }
 }

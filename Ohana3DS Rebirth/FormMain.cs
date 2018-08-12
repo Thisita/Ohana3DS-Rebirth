@@ -1,4 +1,7 @@
-﻿using System;
+﻿using Ohana3DS_Rebirth.GUI;
+using Ohana3DS_Rebirth.Ohana;
+using Ohana3DS_Rebirth.Tools;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -12,14 +15,16 @@ namespace Ohana3DS_Rebirth
 {
     public partial class FormMain : Form
     {
+        FileIO.formatType currentFormat;
+
         public FormMain()
         {
             InitializeComponent();
         }
 
-        private void aboutToolStripMenuItem_Click(object sender, EventArgs e) => MessageBox.Show("Ohana3DS Rebirth made by gdkchan and edited by thisita", "About", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        private void AboutToolStripMenuItem_Click(object sender, EventArgs e) => MessageBox.Show("Ohana3DS Rebirth made by gdkchan and edited by thisita", "About", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
-        private void openToolStripMenuItem_Click(object sender, EventArgs e)
+        private void OpenToolStripMenuItem_Click(object sender, EventArgs e)
         {
             using(OpenFileDialog ofn = new OpenFileDialog() { Filter = "All Files (*.*)|*.*"})
             {
@@ -30,12 +35,58 @@ namespace Ohana3DS_Rebirth
             }
         }
 
-        private void OpenFile(string filename)
+        public void OpenFile(string filename)
         {
+            if(ContentContainer.Controls.Count > 0)
+            {
+                ContentContainer.Controls.Clear();
+            }
 
+            try
+            {
+                FileIO.file file = FileIO.load(filename);
+                currentFormat = file.type;
+
+                if (currentFormat != FileIO.formatType.unsupported)
+                {
+                    switch (currentFormat)
+                    {
+                        case FileIO.formatType.container:
+                            ContentContainer.Controls.Add(new OContainerPanel());
+                            break;
+                        case FileIO.formatType.image:
+                            ContentContainer.Controls.Add(new OImagePanel());
+                            break;
+                        case FileIO.formatType.model:
+                            ContentContainer.Controls.Add(new OViewportPanel());
+                            break;
+                        case FileIO.formatType.texture:
+                            ContentContainer.Controls.Add(new OTexturesPanel());
+                            break;
+                    }
+
+                    ContentContainer.Controls[0].Dock = DockStyle.Fill;
+                    ((IPanel)ContentContainer.Controls[0]).launch(file.data);
+                    ContentContainer.Invalidate();
+                }
+                else
+                    MessageBox.Show("Unsupported file format!", "Error", MessageBoxButtons.OK,
+                        MessageBoxIcon.Exclamation);
+
+            }
+            catch (Exception)
+            {
+                MessageBox.Show("Unsupported file format!", "Error", MessageBoxButtons.OK,
+                    MessageBoxIcon.Exclamation);
+
+                if (ContentContainer.Controls.Count > 0)
+                {
+                    ContentContainer.Controls.Clear();
+                }
+            }
         }
 
-        private void exitToolStripMenuItem_Click(object sender, EventArgs e) => Application.Exit();
+        private void ExitToolStripMenuItem_Click(object sender, EventArgs e) => Close();
 
         private void AANoneToolStripMenuItem_Click(object sender, EventArgs e) => UpdateAA((ToolStripMenuItem)sender, 0);
 
@@ -53,6 +104,7 @@ namespace Ohana3DS_Rebirth
             sender.Checked = true;
             Properties.Settings.Default.reAntiAlias = value;
             Properties.Settings.Default.Save();
+            menuStrip1.Invalidate();
         }
 
         private void BackgroundBlackToolStripMenuItem_Click(object sender, EventArgs e) => UpdateBackgound((ToolStripMenuItem)sender, Color.Black.ToArgb());
@@ -76,8 +128,9 @@ namespace Ohana3DS_Rebirth
         {
             BackgroundBlackToolStripMenuItem.Checked = BackgroundGrayToolStripMenuItem.Checked = BackgroundWhiteToolStripMenuItem.Checked = BackgroundCustomToolStripMenuItem.Checked = false;
             sender.Checked = true;
-            Properties.Settings.Default.reBackgroundColor = value);
+            Properties.Settings.Default.reBackgroundColor = value;
             Properties.Settings.Default.Save();
+            menuStrip1.Invalidate();
         }
 
         private void FormMain_DragDrop(object sender, DragEventArgs e)
@@ -93,6 +146,16 @@ namespace Ohana3DS_Rebirth
             {
                 MessageBox.Show("Unsupported operation", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private void BCHTextureReplacerToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            new FormBCHTextureReplacer().Show(this);
+        }
+
+        private void Sm4shModelCreatorToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            new FormSm4shModelCreator().Show(this);
         }
     }
 }

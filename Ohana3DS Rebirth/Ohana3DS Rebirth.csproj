@@ -68,11 +68,23 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="FormBCHTextureReplacer.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FormBCHTextureReplacer.Designer.cs">
+      <DependentUpon>FormBCHTextureReplacer.cs</DependentUpon>
+    </Compile>
     <Compile Include="FormMain.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="FormMain.Designer.cs">
       <DependentUpon>FormMain.cs</DependentUpon>
+    </Compile>
+    <Compile Include="FormSm4shModelCreator.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FormSm4shModelCreator.Designer.cs">
+      <DependentUpon>FormSm4shModelCreator.cs</DependentUpon>
     </Compile>
     <Compile Include="FrmMain.cs">
       <SubType>Form</SubType>
@@ -283,8 +295,14 @@
     <Compile Include="Tools\OSm4shModelCreator.Designer.cs">
       <DependentUpon>OSm4shModelCreator.cs</DependentUpon>
     </Compile>
+    <EmbeddedResource Include="FormBCHTextureReplacer.resx">
+      <DependentUpon>FormBCHTextureReplacer.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="FormMain.resx">
       <DependentUpon>FormMain.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="FormSm4shModelCreator.resx">
+      <DependentUpon>FormSm4shModelCreator.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="FrmMain.resx">
       <DependentUpon>FrmMain.cs</DependentUpon>

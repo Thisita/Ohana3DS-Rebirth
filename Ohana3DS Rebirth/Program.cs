@@ -15,9 +15,9 @@ namespace Ohana3DS_Rebirth
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             
-            FrmMain form = new FrmMain();
-            if (args.Length == 1 && File.Exists(args[0])) form.setFileToOpen(args[0]);
-            Application.Run(form);
+            //FrmMain form = new FrmMain();
+            //if (args.Length == 1 && File.Exists(args[0])) form.setFileToOpen(args[0]);
+            Application.Run(new FormMain());
         }
     }
 }
