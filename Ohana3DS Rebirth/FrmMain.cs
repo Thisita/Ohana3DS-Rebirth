@@ -23,7 +23,7 @@ namespace Ohana3DS_Rebirth
         private void FrmMain_Load(object sender, EventArgs e)
         {
             //Viewport menu settings
-            switch (Settings.Default.reAntiAlias)
+            switch (Properties.Settings.Default.reAntiAlias)
             {
                 case 0: MenuViewAANone.Checked = true; break;
                 case 2: MenuViewAA2x.Checked = true; break;
@@ -32,12 +32,12 @@ namespace Ohana3DS_Rebirth
                 case 16: MenuViewAA16x.Checked = true; break;
             }
 
-            MenuViewShowGuidelines.Checked = Settings.Default.reShowGuidelines;
-            MenuViewShowInformation.Checked = Settings.Default.reShowInformation;
-            MenuViewShowAllMeshes.Checked = Settings.Default.reShowAllMeshes;
+            MenuViewShowGuidelines.Checked = Properties.Settings.Default.reShowGuidelines;
+            MenuViewShowInformation.Checked = Properties.Settings.Default.reShowInformation;
+            MenuViewShowAllMeshes.Checked = Properties.Settings.Default.reShowAllMeshes;
 
-            MenuViewFragmentShader.Checked = Settings.Default.reFragmentShader;
-            switch (Settings.Default.reLegacyTexturingMode)
+            MenuViewFragmentShader.Checked = Properties.Settings.Default.reFragmentShader;
+            switch (Properties.Settings.Default.reLegacyTexturingMode)
             {
                 case 0: MenuViewTexUseFirst.Checked = true; break;
                 case 1: MenuViewTexUseLast.Checked = true; break;
@@ -395,7 +395,6 @@ namespace Ohana3DS_Rebirth
             if (currentFormat == FileIO.formatType.model)
             {
                 OViewportPanel viewport = (OViewportPanel)currentPanel;
-                viewport.renderer.updateSettings();
                 viewport.ShowSidebar = MenuViewShowSidebar.Checked;
             }
         }

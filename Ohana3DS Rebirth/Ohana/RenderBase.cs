@@ -1545,7 +1545,7 @@ namespace Ohana3DS_Rebirth.Ohana
         /// <summary>
         ///     Texture, contains the texture name and Bitmap image.
         /// </summary>
-        public class OTexture
+        public class OTexture : IDisposable
         {
             public Bitmap texture;
             public string name;
@@ -1561,6 +1561,22 @@ namespace Ohana3DS_Rebirth.Ohana
                 _texture.Dispose();
                 name = _name;
             }
+
+            protected virtual void Dispose(bool disposing)
+            {
+                if (disposing)
+                {
+                    if (texture != null) texture.Dispose();
+                }
+                // free native resources
+            }
+
+            public void Dispose()
+            {
+                Dispose(true);
+                GC.SuppressFinalize(this);
+            }
+
         }
 
         /// <summary>

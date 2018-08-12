@@ -7,7 +7,6 @@ using System.Windows.Forms;
 
 using Microsoft.DirectX;
 using Microsoft.DirectX.Direct3D;
-
 using Ohana3DS_Rebirth.Properties;
 
 namespace Ohana3DS_Rebirth.Ohana
@@ -53,17 +52,6 @@ namespace Ohana3DS_Rebirth.Ohana
         {
             get { return zoom; }
         }
-
-        private int cfgAntiAlias;
-        private int cfgBackColor;
-        private bool cfgShowGuidelines;
-        private bool cfgShowInformation;
-        private bool cfgShowAllMeshes;
-        private bool cfgFragmentShader;
-        private int cfgLegacyTexturingMode;
-        private bool cfgWireframeMode;
-
-        private bool fragmentShaderMode;
 
         const string infoHUDFontFamily = "Times New Roman";
         const int infoHUDFontSize = 14;
@@ -224,11 +212,10 @@ namespace Ohana3DS_Rebirth.Ohana
         /// <param name="height">Render height</param>
         public void initialize(IntPtr handle, int width, int height)
         {
-            cfgAntiAlias = Settings.Default.reAntiAlias;
-            if (!Manager.CheckDeviceMultiSampleType(0, DeviceType.Hardware, Format.D16, true, (MultiSampleType)cfgAntiAlias))
+            if (!Manager.CheckDeviceMultiSampleType(0, DeviceType.Hardware, Format.D16, true, (MultiSampleType)Properties.Settings.Default.reAntiAlias))
             {
                 MessageBox.Show("MSAA level not supported by GPU!", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                cfgAntiAlias = 0;
+                Properties.Settings.Default.reAntiAlias = 0;
             }
 
             pParams = new PresentParameters
@@ -241,7 +228,7 @@ namespace Ohana3DS_Rebirth.Ohana
                 SwapEffect = SwapEffect.Discard,
                 EnableAutoDepthStencil = true,
                 AutoDepthStencilFormat = DepthFormat.D24S8,
-                MultiSample = (MultiSampleType)cfgAntiAlias
+                MultiSample = (MultiSampleType)Properties.Settings.Default.reAntiAlias
             };
 
             try
@@ -261,8 +248,7 @@ namespace Ohana3DS_Rebirth.Ohana
             }
 
             //Compile the Fragment Shader
-            fragmentShaderMode = Settings.Default.reFragmentShader;
-            if (fragmentShaderMode)
+            if (Properties.Settings.Default.reFragmentShader)
             {
                 string compilationErrors;
                 fragmentShader = Effect.FromString(device, Resources.OFragmentShader, null, null, ShaderFlags.SkipOptimization, null, out compilationErrors);
@@ -323,7 +309,6 @@ namespace Ohana3DS_Rebirth.Ohana
 
             updateMeshes();
             updateTextures();
-            updateSettings();
 
             animator = new Timer();
             animator.Interval = 1;
@@ -364,7 +349,7 @@ namespace Ohana3DS_Rebirth.Ohana
             foreach (customTexture texture in textures) texture.texture.Dispose();
             foreach (RenderBase.OTexture texture in models.texture) texture.texture.Dispose();
 
-            if (fragmentShaderMode) fragmentShader.Dispose();
+            if (fragmentShader != null) fragmentShader.Dispose();
             device.Dispose();
             infoHUD.Dispose();
             animator.Dispose();
@@ -496,26 +481,11 @@ namespace Ohana3DS_Rebirth.Ohana
         }
 
         /// <summary>
-        ///     Reloads all settings from the app settings file.
-        ///     Call this when you changes the settings.
-        /// </summary>
-        public void updateSettings()
-        {
-            cfgBackColor = Settings.Default.reBackgroundColor;
-            cfgFragmentShader = Settings.Default.reFragmentShader;
-            cfgShowGuidelines = Settings.Default.reShowGuidelines;
-            cfgShowInformation = Settings.Default.reShowInformation;
-            cfgShowAllMeshes = Settings.Default.reShowAllMeshes;
-            cfgLegacyTexturingMode = Settings.Default.reLegacyTexturingMode;
-            cfgWireframeMode = Settings.Default.reWireframeMode;
-        }
-
-        /// <summary>
         ///     Renders a single frame of the scene.
         /// </summary>
         public void render()
         {
-            device.Clear(ClearFlags.Stencil | ClearFlags.Target | ClearFlags.ZBuffer, cfgBackColor, 1f, 15);
+            device.Clear(ClearFlags.Stencil | ClearFlags.Target | ClearFlags.ZBuffer, Properties.Settings.Default.reBackgroundColor, 1f, 15);
             device.SetTexture(0, null);
             device.BeginScene();
 
@@ -556,7 +526,7 @@ namespace Ohana3DS_Rebirth.Ohana
             baseTransform *= centerMatrix * translationMatrix * Matrix.Scaling(-scale, scale, scale);
 
             //Grid
-            if (cfgShowGuidelines)
+            if (Properties.Settings.Default.reShowGuidelines)
             {
                 resetRenderState();
                 device.Transform.World = baseTransform;
@@ -569,7 +539,7 @@ namespace Ohana3DS_Rebirth.Ohana
                 }
             }
 
-            if (fragmentShaderMode)
+            if (Properties.Settings.Default.reFragmentShader)
             {
                 fragmentShader.Begin(0);
 
@@ -584,7 +554,7 @@ namespace Ohana3DS_Rebirth.Ohana
                 fragmentShader.SetValue("numLights", 1);
             }
 
-            if (cfgWireframeMode)
+            if (Properties.Settings.Default.reWireframeMode)
                 device.RenderState.FillMode = FillMode.WireFrame;
             else
                 device.RenderState.FillMode = FillMode.Solid;
@@ -778,7 +748,7 @@ namespace Ohana3DS_Rebirth.Ohana
                         }
                     }
 
-                    if (!(isVisible || cfgShowAllMeshes)) continue;
+                    if (!(isVisible || Properties.Settings.Default.reShowAllMeshes)) continue;
 
                     RenderBase.OMaterial material = mdl.material[obj.materialId];
 
@@ -810,7 +780,7 @@ namespace Ohana3DS_Rebirth.Ohana
                     }
                     #endregion
 
-                    if (fragmentShaderMode)
+                    if (Properties.Settings.Default.reFragmentShader)
                     {
                         #region "Shader combiner parameters"
                         RenderBase.OMaterialColor materialColor = new RenderBase.OMaterialColor();
@@ -916,7 +886,7 @@ namespace Ohana3DS_Rebirth.Ohana
                             for (int j = 0; j < 3; j++) if (textureId[j] > -1) name[j] = ma.textureName[textureId[j]];
                         }
 
-                        if (cfgLegacyTexturingMode == 0 && !fragmentShaderMode)
+                        if (Properties.Settings.Default.reLegacyTexturingMode == 0 && !Properties.Settings.Default.reFragmentShader)
                         {
                             if (textures[i].name == name[0])
                             {
@@ -929,7 +899,7 @@ namespace Ohana3DS_Rebirth.Ohana
                         {
                             for (int j = 0; j < 3; j++)
                             {
-                                if (fragmentShaderMode)
+                                if (Properties.Settings.Default.reFragmentShader)
                                 {
                                     if (textures[i].name == name[j])
                                     {
@@ -949,7 +919,7 @@ namespace Ohana3DS_Rebirth.Ohana
                         }
                     }
 
-                    if (!fragmentShaderMode)
+                    if (!Properties.Settings.Default.reFragmentShader)
                     {
                         if (legacyTextureIndex > -1)
                             device.SetTexture(0, textures[legacyTextureIndex].texture);
@@ -991,7 +961,7 @@ namespace Ohana3DS_Rebirth.Ohana
                         }
                         #endregion
 
-                        if (fragmentShaderMode)
+                        if (Properties.Settings.Default.reFragmentShader)
                         {
                             fragmentShader.SetValue(string.Format("uvTranslate[{0}]", s), new Vector4(-translate.X, -translate.Y, 0, 0));
                             fragmentShader.SetValue(string.Format("uvScale[{0}]", s), new Vector4(scaling.X, scaling.Y, 0, 0));
@@ -1079,7 +1049,7 @@ namespace Ohana3DS_Rebirth.Ohana
                     VertexFormats vertexFormat = VertexFormats.Position | VertexFormats.Normal | VertexFormats.Texture3 | VertexFormats.Diffuse;
                     device.VertexFormat = vertexFormat;
 
-                    if (fragmentShaderMode) fragmentShader.BeginPass(0);
+                    if (Properties.Settings.Default.reFragmentShader) fragmentShader.BeginPass(0);
 
                     if (meshes[objectIndex].Length > 0)
                     {
@@ -1122,15 +1092,15 @@ namespace Ohana3DS_Rebirth.Ohana
                         }
                     }
 
-                    if (fragmentShaderMode) fragmentShader.EndPass();
+                    if (Properties.Settings.Default.reFragmentShader) fragmentShader.EndPass();
                     #endregion
                 }
             }
 
-            if (fragmentShaderMode) fragmentShader.End();
+            if (Properties.Settings.Default.reFragmentShader) fragmentShader.End();
 
             //HUD
-            if (cfgShowInformation && currentModel > -1)
+            if (Properties.Settings.Default.reShowInformation && currentModel > -1)
             {
                 resetRenderState();
                 RenderBase.OModel mdl = models.model[currentModel];
