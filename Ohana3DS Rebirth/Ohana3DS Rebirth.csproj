@@ -295,7 +295,25 @@
     <Compile Include="Tools\OSm4shModelCreator.Designer.cs">
       <DependentUpon>OSm4shModelCreator.cs</DependentUpon>
     </Compile>
+    <Compile Include="UI\Panels\AnimationsPanel.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="UI\Panels\AnimationsPanel.Designer.cs">
+      <DependentUpon>AnimationsPanel.cs</DependentUpon>
+    </Compile>
+    <Compile Include="UI\Panels\ContainerPanel.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="UI\Panels\ContainerPanel.Designer.cs">
+      <DependentUpon>ContainerPanel.cs</DependentUpon>
+    </Compile>
     <Compile Include="UI\Panels\IFileRenderPanel.cs" />
+    <Compile Include="UI\Panels\ImagePanel.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="UI\Panels\ImagePanel.Designer.cs">
+      <DependentUpon>ImagePanel.cs</DependentUpon>
+    </Compile>
     <Compile Include="UI\Panels\IRenderEnginePanel.cs" />
     <Compile Include="UI\Panels\ModelsPanel.cs">
       <SubType>UserControl</SubType>
@@ -387,6 +405,15 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Tools\OSm4shModelCreator.resx">
       <DependentUpon>OSm4shModelCreator.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\Panels\AnimationsPanel.resx">
+      <DependentUpon>AnimationsPanel.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\Panels\ContainerPanel.resx">
+      <DependentUpon>ContainerPanel.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\Panels\ImagePanel.resx">
+      <DependentUpon>ImagePanel.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="UI\Panels\ModelsPanel.resx">
       <DependentUpon>ModelsPanel.cs</DependentUpon>

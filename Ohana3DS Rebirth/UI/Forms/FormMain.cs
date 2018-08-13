@@ -63,10 +63,10 @@ namespace Ohana3DS_Rebirth
                     switch (currentFormat)
                     {
                         case FileIO.formatType.container:
-                            ContentContainer.Controls.Add(new OContainerPanel());
+                            ContentContainer.Controls.Add(new ContainerPanel());
                             break;
                         case FileIO.formatType.image:
-                            ContentContainer.Controls.Add(new OImagePanel());
+                            ContentContainer.Controls.Add(new ImagePanel());
                             break;
                         case FileIO.formatType.model:
                             ContentContainer.Controls.Add(new ViewportPanel());
