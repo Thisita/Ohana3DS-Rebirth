@@ -5,8 +5,10 @@ using System.Drawing;
 using System.Text;
 using System.Windows.Forms;
 
-using Microsoft.DirectX;
-using Microsoft.DirectX.Direct3D;
+using SharpDX;
+using SharpDX.Direct3D9;
+using SharpDX.Mathematics.Interop;
+using Color = SharpDX.Color;
 using Ohana3DS_Rebirth.Properties;
 
 namespace Ohana3DS_Rebirth.Ohana
@@ -17,10 +19,16 @@ namespace Ohana3DS_Rebirth.Ohana
 
         private Effect fragmentShader;
         private PresentParameters pParams;
-        private Device device;
-        private Microsoft.DirectX.Direct3D.Font infoHUD;
+        private SharpDX.Direct3D9.Device device;
+        private SharpDX.Direct3D9.Font infoHUD;
 
         public RenderBase.OModelGroup models;
+
+        struct Vertex
+        {
+            public Vector4 Position;
+            public ColorBGRA Color;
+        }
 
         public struct customVertex
         {
@@ -77,7 +85,7 @@ namespace Ohana3DS_Rebirth.Ohana
                 set
                 {
                     frame = value;
-                    if (FrameChanged != null) FrameChanged(this, EventArgs.Empty);
+                    FrameChanged?.Invoke(this, EventArgs.Empty);
                 }
             }
 
@@ -90,7 +98,7 @@ namespace Ohana3DS_Rebirth.Ohana
                 set
                 {
                     currentAnimation = value;
-                    if (AnimationChanged != null) AnimationChanged(this, EventArgs.Empty);
+                    AnimationChanged?.Invoke(this, EventArgs.Empty);
                 }
             }
 
@@ -112,7 +120,7 @@ namespace Ohana3DS_Rebirth.Ohana
             public bool load(int animationIndex)
             {
                 currentAnimation = animationIndex;
-                if (AnimationChanged != null) AnimationChanged(this, EventArgs.Empty);
+                AnimationChanged?.Invoke(this, EventArgs.Empty);
                 frame = 0;
                 return true;
             }
@@ -201,7 +209,7 @@ namespace Ohana3DS_Rebirth.Ohana
             }
         }
 
-        CustomVertex.PositionColored[] gridBuffer;
+        List<Vertex> gridBuffer;
         Timer animator;
 
         /// <summary>
@@ -227,80 +235,96 @@ namespace Ohana3DS_Rebirth.Ohana
                 Windowed = true,
                 SwapEffect = SwapEffect.Discard,
                 EnableAutoDepthStencil = true,
-                AutoDepthStencilFormat = DepthFormat.D24S8,
-                MultiSample = (MultiSampleType)Properties.Settings.Default.reAntiAlias
+                AutoDepthStencilFormat = Format.D24S8,
+                MultiSampleType = (MultisampleType)Properties.Settings.Default.reAntiAlias
             };
 
             try
             {
-                device = new Device(0, DeviceType.Hardware, handle, CreateFlags.HardwareVertexProcessing, pParams);
+                device = new Device(new Direct3D(), 0, DeviceType.Hardware, handle, CreateFlags.HardwareVertexProcessing, pParams);
             }
             catch
             {
                 //Some crap GPUs only works with Software vertex processing
-                device = new Device(0, DeviceType.Hardware, handle, CreateFlags.SoftwareVertexProcessing, pParams);
+                device = new Device(new Direct3D(), 0, DeviceType.Hardware, handle, CreateFlags.SoftwareVertexProcessing, pParams);
             }
 
             //Information font setup
-            using (System.Drawing.Font HUDFont = new System.Drawing.Font(infoHUDFontFamily, infoHUDFontSize))
+            FontDescription HUDFont = new FontDescription()
             {
-                infoHUD = new Microsoft.DirectX.Direct3D.Font(device, HUDFont);
-            }
+                FaceName = infoHUDFontFamily,
+                Height = infoHUDFontSize,
+                Italic = false,
+                CharacterSet = FontCharacterSet.Ansi,
+                MipLevels = 0,
+                OutputPrecision = FontPrecision.TrueType,
+                PitchAndFamily = FontPitchAndFamily.Default,
+                Quality = FontQuality.ClearType,
+                Weight = FontWeight.Regular
+            };
+            infoHUD = new SharpDX.Direct3D9.Font(device, HUDFont);
 
             //Compile the Fragment Shader
             if (Properties.Settings.Default.reFragmentShader)
             {
-                string compilationErrors;
-                fragmentShader = Effect.FromString(device, Resources.OFragmentShader, null, null, ShaderFlags.SkipOptimization, null, out compilationErrors);
-                fragmentShader.Technique = "Combiner";
-                if (compilationErrors != "")
-                    MessageBox.Show(
-                        "Failed to compile Fragment Shader!" + Environment.NewLine +
-                        compilationErrors,
-                        "Error",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error);
+                try
+                {
+
+                    fragmentShader = Effect.FromString(device, Resources.OFragmentShader, ShaderFlags.SkipOptimization);
+                    fragmentShader.Technique = "Combiner";
+                }
+                catch (Exception)
+                {
+                    MessageBox.Show("Failed to compile Fragment Shader!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
 
             #region "Grid buffer creation"
-            gridBuffer = new CustomVertex.PositionColored[218];
-            int bufferIndex = 0;
+            gridBuffer = new List<Vertex>();
             for (int i = -50; i <= 50; i += 2)
             {
                 if (i == 0)
                 {
-                    gridBuffer[bufferIndex++] = new CustomVertex.PositionColored(-50f, 0, i, Color.White.ToArgb());
-                    gridBuffer[bufferIndex++] = new CustomVertex.PositionColored(0, 0, i, Color.White.ToArgb());
-                    gridBuffer[bufferIndex++] = new CustomVertex.PositionColored(5f, 0, i, Color.White.ToArgb());
-                    gridBuffer[bufferIndex++] = new CustomVertex.PositionColored(50f, 0, i, Color.White.ToArgb());
+                    // TODO: Check why i is ref
+                    gridBuffer.AddRange(new[] {
+                        new Vertex() { Color = Color.White, Position = new Vector4(-50f, 0, i, 1.0f)},
+                        new Vertex() { Color = Color.White, Position = new Vector4(0, 0, i, 1.0f)},
+                        new Vertex() { Color = Color.White, Position = new Vector4(5f, 0, i, 1.0f)},
+                        new Vertex() { Color = Color.White, Position = new Vector4(50f, 0, i, 1.0f)},
 
-                    gridBuffer[bufferIndex++] = new CustomVertex.PositionColored(i, 0, -50f, Color.White.ToArgb());
-                    gridBuffer[bufferIndex++] = new CustomVertex.PositionColored(i, 0, -5f, Color.White.ToArgb());
-                    gridBuffer[bufferIndex++] = new CustomVertex.PositionColored(i, 0, 0, Color.White.ToArgb());
-                    gridBuffer[bufferIndex++] = new CustomVertex.PositionColored(i, 0, 50f, Color.White.ToArgb());
+                        new Vertex() { Color = Color.White, Position = new Vector4(i, 0, -50f, 1.0f)},
+                        new Vertex() { Color = Color.White, Position = new Vector4(i, 0, -5f, 1.0f)},
+                        new Vertex() { Color = Color.White, Position = new Vector4(i, 0, 0, 1.0f)},
+                        new Vertex() { Color = Color.White, Position = new Vector4(i, 0, 50f, 1.0f)}
+                    });
                 }
                 else
                 {
-                    int lColor;
+                    Color lColor;
                     if ((i % 10) == 0)
-                        lColor = Color.White.ToArgb();
+                        lColor = Color.White;
                     else
-                        lColor = Color.DarkGray.ToArgb();
+                        lColor = Color.DarkGray;
 
-                    gridBuffer[bufferIndex++] = new CustomVertex.PositionColored(-50f, 0, i, lColor);
-                    gridBuffer[bufferIndex++] = new CustomVertex.PositionColored(50f, 0, i, lColor);
-                    gridBuffer[bufferIndex++] = new CustomVertex.PositionColored(i, 0, -50f, lColor);
-                    gridBuffer[bufferIndex++] = new CustomVertex.PositionColored(i, 0, 50f, lColor);
+                    gridBuffer.AddRange(new[]
+                    {
+                        new Vertex() { Color = lColor, Position = new Vector4(-50f, 0, i, 1.0f)},
+                        new Vertex() { Color = lColor, Position = new Vector4(50f, 0, i, 1.0f)},
+                        new Vertex() { Color = lColor, Position = new Vector4(i, 0, -50f, 1.0f)},
+                        new Vertex() { Color = lColor, Position = new Vector4(i, 0, 50f, 1.0f)},
+                    });
                 }
             }
-            gridBuffer[bufferIndex++] = new CustomVertex.PositionColored(0, 0, 0, Color.Red.ToArgb());
-            gridBuffer[bufferIndex++] = new CustomVertex.PositionColored(5f, 0, 0, Color.Red.ToArgb());
 
-            gridBuffer[bufferIndex++] = new CustomVertex.PositionColored(0, 0, 0, Color.Green.ToArgb());
-            gridBuffer[bufferIndex++] = new CustomVertex.PositionColored(0, 5f, 0, Color.Green.ToArgb());
-
-            gridBuffer[bufferIndex++] = new CustomVertex.PositionColored(0, 0, 0, Color.Blue.ToArgb());
-            gridBuffer[bufferIndex] = new CustomVertex.PositionColored(0, 0, -5f, Color.Blue.ToArgb());
+            gridBuffer.AddRange(new[]
+            {
+                new Vertex() { Color = Color.Red, Position = new Vector4(0, 0, 0, 1.0f) },
+                new Vertex() { Color = Color.Red, Position = new Vector4(5f, 0, 0, 1.0f) },
+                new Vertex() { Color = Color.Green, Position = new Vector4(0, 0, 0, 1.0f) },
+                new Vertex() { Color = Color.Green, Position = new Vector4(0, 5f, 0, 1.0f) },
+                new Vertex() { Color = Color.Blue, Position = new Vector4(0, 0, 0, 1.0f) },
+                new Vertex() { Color = Color.Blue, Position = new Vector4(0, 0, -5f, 1.0f) },
+            });
             #endregion
 
             ctrlSA.animations = models.skeletalAnimation;
@@ -330,7 +354,7 @@ namespace Ohana3DS_Rebirth.Ohana
         public void resize(int width, int height)
         {
             if (width == 0 || height == 0) return;
-
+            
             pParams.BackBufferWidth = width;
             pParams.BackBufferHeight = height;
             device.Reset(pParams);
@@ -480,22 +504,28 @@ namespace Ohana3DS_Rebirth.Ohana
             textures.RemoveAt(index);
         }
 
+        public Color FromDrawingColor(System.Drawing.Color color)
+        {
+            return new Color(color.R, color.G, color.B, color.A);
+        }
+
         /// <summary>
         ///     Renders a single frame of the scene.
         /// </summary>
         public void render()
         {
-            device.Clear(ClearFlags.Stencil | ClearFlags.Target | ClearFlags.ZBuffer, Properties.Settings.Default.reBackgroundColor, 1f, 15);
+            RawColorBGRA backgroundColor = new RawColorBGRA(0, 0, 0, 0xFF);
+            device.Clear(ClearFlags.Stencil | ClearFlags.Target | ClearFlags.ZBuffer, backgroundColor, 1f, 15);
             device.SetTexture(0, null);
             device.BeginScene();
 
             float fovy = (float)Math.PI / 4;
             float aspectRatio = (float)pParams.BackBufferWidth / pParams.BackBufferHeight;
-            device.Transform.Projection = Matrix.PerspectiveFovLH(fovy, aspectRatio, 0.01f, 1000f);
-            device.Transform.View = Matrix.LookAtLH(
+            device.SetTransform(TransformState.Projection, Matrix.PerspectiveFovLH(fovy, aspectRatio, 0.01f, 1000f));
+            device.SetTransform(TransformState.View, Matrix.LookAtLH(
                 new Vector3(0f, 0f, 20f),
                 new Vector3(0f, 0f, 0f),
-                new Vector3(0f, 1f, 0f));
+                new Vector3(0f, 1f, 0f)));
 
             //View
             RenderBase.OVector3 minVector = new RenderBase.OVector3();
@@ -529,23 +559,23 @@ namespace Ohana3DS_Rebirth.Ohana
             if (Properties.Settings.Default.reShowGuidelines)
             {
                 resetRenderState();
-                device.Transform.World = baseTransform;
-                device.VertexFormat = CustomVertex.PositionColored.Format;
-                using (VertexBuffer buffer = new VertexBuffer(typeof(CustomVertex.PositionColored), gridBuffer.Length, device, Usage.None, CustomVertex.PositionColored.Format, Pool.Managed))
-                {
-                    buffer.SetData(gridBuffer, 0, LockFlags.None);
-                    device.SetStreamSource(0, buffer, 0);
-                    device.DrawPrimitives(PrimitiveType.LineList, 0, gridBuffer.Length / 2);
-                }
+                device.SetTransform(TransformState.World, baseTransform);
+                //device.VertexFormat = CustomVertex.PositionColored.Format;
+
+                VertexBuffer buffer = new VertexBuffer(device, gridBuffer.Count * 20, Usage.WriteOnly, VertexFormat.None, Pool.Managed);
+                buffer.Lock(0, 0, LockFlags.None).WriteRange(gridBuffer.ToArray());
+                buffer.Unlock();
+                device.SetStreamSource(0, buffer, 0, 20);
+                device.DrawPrimitives(PrimitiveType.LineList, 0, gridBuffer.Count / 2);
             }
 
             if (Properties.Settings.Default.reFragmentShader)
             {
                 fragmentShader.Begin(0);
 
-                fragmentShader.SetValue("world", device.Transform.World);
-                fragmentShader.SetValue("view", device.Transform.View);
-                fragmentShader.SetValue("projection", device.Transform.Projection);
+                fragmentShader.SetValue("world", device.GetTransform(TransformState.World));
+                fragmentShader.SetValue("view", device.GetTransform(TransformState.View));
+                fragmentShader.SetValue("projection", device.GetTransform(TransformState.Projection));
 
                 fragmentShader.SetValue("lights[0].pos", new Vector4(0, -10, -10, 0));
                 fragmentShader.SetValue("lights[0].ambient", new Vector4(0.1f, 0.1f, 0.1f, 1));
@@ -555,14 +585,14 @@ namespace Ohana3DS_Rebirth.Ohana
             }
 
             if (Properties.Settings.Default.reWireframeMode)
-                device.RenderState.FillMode = FillMode.WireFrame;
+                device.SetRenderState(RenderState.FillMode, FillMode.Wireframe);
             else
-                device.RenderState.FillMode = FillMode.Solid;
+                device.SetRenderState(RenderState.FillMode, FillMode.Solid);
 
             if (currentModel > -1)
             {
                 RenderBase.OModel mdl = models.model[currentModel];
-                device.Transform.World = getMatrix(mdl.transform) * baseTransform;
+                device.SetTransform(TransformState.World, getMatrix(mdl.transform) * baseTransform);
 
                 #region "Skeletal Animation"
                 Matrix[] animationSkeletonTransform = new Matrix[mdl.skeleton.Count];
@@ -754,11 +784,11 @@ namespace Ohana3DS_Rebirth.Ohana
 
                     #region "Material Animation"
                     int[] textureId = { -1, -1, -1 };
-                    Color blendColor = material.fragmentOperation.blend.blendColor;
+                    Color blendColor = FromDrawingColor(material.fragmentOperation.blend.blendColor);
                     Color[] borderColor = new Color[3];
-                    borderColor[0] = material.textureMapper[0].borderColor;
-                    borderColor[1] = material.textureMapper[1].borderColor;
-                    borderColor[2] = material.textureMapper[2].borderColor;
+                    borderColor[0] = FromDrawingColor(material.textureMapper[0].borderColor);
+                    borderColor[1] = FromDrawingColor(material.textureMapper[1].borderColor);
+                    borderColor[2] = FromDrawingColor(material.textureMapper[2].borderColor);
                     if (ctrlMA.animate)
                     {
                         foreach (RenderBase.OMaterialAnimationData data in ((RenderBase.OMaterialAnimation)models.materialAnimation.list[ctrlMA.CurrentAnimation]).data)
@@ -935,7 +965,7 @@ namespace Ohana3DS_Rebirth.Ohana
 
                         Vector2 translate = new Vector2(coordinator.translateU, coordinator.translateV);
                         Vector2 scaling = new Vector2(coordinator.scaleU, coordinator.scaleV);
-                        if (scaling == Vector2.Empty) scaling = new Vector2(1, 1);
+                        if (scaling == Vector2.Zero) scaling = new Vector2(1, 1);
                         float rotate = coordinator.rotate;
                         #region "Material Animation"
                         if (ctrlMA.animate)
@@ -969,33 +999,33 @@ namespace Ohana3DS_Rebirth.Ohana
                         }
                         else
                         {
-                            device.SetTextureStageState(s, TextureStageStates.TextureTransform, (int)TextureTransform.Count2);
+                            device.SetTextureStageState(s, TextureStage.TextureTransformFlags, (int)TextureTransform.Count2);
                             Matrix uvTransform = rotateCenter2D(rotate) * Matrix.Scaling(scaling.X, scaling.Y, 1) * translate2D(-translate);
-                            if (s == legacyTextureUnit) device.Transform.Texture0 = uvTransform;
+                            if (s == legacyTextureUnit) device.SetTransform(TransformState.Texture0, uvTransform);
                         }
 
-                        device.SetSamplerState(s, SamplerStageStates.MinFilter, (int)TextureFilter.Linear);
+                        device.SetSamplerState(s, SamplerState.MinFilter, (int)TextureFilter.Linear);
                         switch (material.textureMapper[s].magFilter)
                         {
-                            case RenderBase.OTextureMagFilter.nearest: device.SetSamplerState(s, SamplerStageStates.MagFilter, (int)TextureFilter.None); break;
-                            case RenderBase.OTextureMagFilter.linear: device.SetSamplerState(s, SamplerStageStates.MagFilter, (int)TextureFilter.Linear); break;
+                            case RenderBase.OTextureMagFilter.nearest: device.SetSamplerState(s, SamplerState.MagFilter, (int)TextureFilter.None); break;
+                            case RenderBase.OTextureMagFilter.linear: device.SetSamplerState(s, SamplerState.MagFilter, (int)TextureFilter.Linear); break;
                         }
 
                         //Addressing
-                        device.SetSamplerState(s, SamplerStageStates.BorderColor, borderColor[s].ToArgb());
+                        device.SetSamplerState(s, SamplerState.BorderColor, borderColor[s].ToArgb());
                         switch (material.textureMapper[s].wrapU)
                         {
-                            case RenderBase.OTextureWrap.repeat: device.SetSamplerState(s, SamplerStageStates.AddressU, (int)TextureAddress.Wrap); break;
-                            case RenderBase.OTextureWrap.mirroredRepeat: device.SetSamplerState(s, SamplerStageStates.AddressU, (int)TextureAddress.Mirror); break;
-                            case RenderBase.OTextureWrap.clampToEdge: device.SetSamplerState(s, SamplerStageStates.AddressU, (int)TextureAddress.Clamp); break;
-                            case RenderBase.OTextureWrap.clampToBorder: device.SetSamplerState(s, SamplerStageStates.AddressU, (int)TextureAddress.Border); break;
+                            case RenderBase.OTextureWrap.repeat: device.SetSamplerState(s, SamplerState.AddressU, (int)TextureAddress.Wrap); break;
+                            case RenderBase.OTextureWrap.mirroredRepeat: device.SetSamplerState(s, SamplerState.AddressU, (int)TextureAddress.Mirror); break;
+                            case RenderBase.OTextureWrap.clampToEdge: device.SetSamplerState(s, SamplerState.AddressU, (int)TextureAddress.Clamp); break;
+                            case RenderBase.OTextureWrap.clampToBorder: device.SetSamplerState(s, SamplerState.AddressU, (int)TextureAddress.Border); break;
                         }
                         switch (material.textureMapper[s].wrapV)
                         {
-                            case RenderBase.OTextureWrap.repeat: device.SetSamplerState(s, SamplerStageStates.AddressV, (int)TextureAddress.Wrap); break;
-                            case RenderBase.OTextureWrap.mirroredRepeat: device.SetSamplerState(s, SamplerStageStates.AddressV, (int)TextureAddress.Mirror); break;
-                            case RenderBase.OTextureWrap.clampToEdge: device.SetSamplerState(s, SamplerStageStates.AddressV, (int)TextureAddress.Clamp); break;
-                            case RenderBase.OTextureWrap.clampToBorder: device.SetSamplerState(s, SamplerStageStates.AddressV, (int)TextureAddress.Border); break;
+                            case RenderBase.OTextureWrap.repeat: device.SetSamplerState(s, SamplerState.AddressV, (int)TextureAddress.Wrap); break;
+                            case RenderBase.OTextureWrap.mirroredRepeat: device.SetSamplerState(s, SamplerState.AddressV, (int)TextureAddress.Mirror); break;
+                            case RenderBase.OTextureWrap.clampToEdge: device.SetSamplerState(s, SamplerState.AddressV, (int)TextureAddress.Clamp); break;
+                            case RenderBase.OTextureWrap.clampToBorder: device.SetSamplerState(s, SamplerState.AddressV, (int)TextureAddress.Border); break;
                         }
                     }
                     #endregion
@@ -1046,7 +1076,7 @@ namespace Ohana3DS_Rebirth.Ohana
 
                     #region "Rendering"
                     //Vertex rendering
-                    VertexFormats vertexFormat = VertexFormats.Position | VertexFormats.Normal | VertexFormats.Texture3 | VertexFormats.Diffuse;
+                    VertexFormat vertexFormat = VertexFormat.Position | VertexFormat.Normal | VertexFormat.Texture3 | VertexFormat.Diffuse;
                     device.VertexFormat = vertexFormat;
 
                     if (Properties.Settings.Default.reFragmentShader) fragmentShader.BeginPass(0);
@@ -1085,8 +1115,8 @@ namespace Ohana3DS_Rebirth.Ohana
 
                         using (VertexBuffer vertexBuffer = new VertexBuffer(typeof(customVertex), buffer.Length, device, Usage.None, vertexFormat, Pool.Managed))
                         {
-                            vertexBuffer.SetData(buffer, 0, LockFlags.None);
-                            device.SetStreamSource(0, vertexBuffer, 0);
+                            vertexBuffer.(buffer, 0, LockFlags.None);
+                            device.SetStreamSource(0, vertexBuffer, 0, 0);
 
                             device.DrawPrimitives(PrimitiveType.TriangleList, 0, buffer.Length / 3);
                         }
@@ -1131,16 +1161,16 @@ namespace Ohana3DS_Rebirth.Ohana
         /// </summary>
         private void resetRenderState()
         {
-            device.RenderState.FillMode = FillMode.Solid;
-            device.RenderState.AlphaTestEnable = false;
-            device.RenderState.ZBufferEnable = true;
-            device.RenderState.ZBufferFunction = Compare.LessEqual;
-            device.RenderState.ZBufferWriteEnable = true;
-            device.RenderState.AlphaBlendEnable = false;
-            device.RenderState.SeparateAlphaBlendEnabled = false;
-            device.RenderState.StencilEnable = false;
-            device.RenderState.CullMode = Cull.None;
-            device.RenderState.Lighting = false;
+            device.SetRenderState(RenderState.FillMode, FillMode.Solid);
+            device.SetRenderState(RenderState.AlphaTestEnable, false);
+            device.SetRenderState(RenderState.ZEnable, true);
+            device.SetRenderState(RenderState.ZFunc, Compare.LessEqual);
+            device.SetRenderState(RenderState.ZWriteEnable, true);
+            device.SetRenderState(RenderState.AlphaBlendEnable, false);
+            device.SetRenderState(RenderState.SeparateAlphaBlendEnable, false);
+            device.SetRenderState(RenderState.StencilEnable, false);
+            device.SetRenderState(RenderState.CullMode, Cull.None);
+            device.SetRenderState(RenderState.Lighting, false);
         }
 
         /// <summary>
@@ -1166,17 +1196,17 @@ namespace Ohana3DS_Rebirth.Ohana
                 vertexBuffer.SetData(boxBuffer, 0, LockFlags.None);
 
                 device.SetTexture(0, null);
-                device.RenderState.AlphaBlendEnable = true;
-                device.RenderState.SourceBlend = Blend.SourceAlpha;
-                device.RenderState.DestinationBlend = Blend.InvSourceAlpha;
-                device.RenderState.AlphaBlendOperation = BlendOperation.Add;
+                device.SetRenderState(RenderState.AlphaBlendEnable, true);
+                device.SetRenderState(RenderState.SourceBlend, Blend.SourceAlpha);
+                device.SetRenderState(RenderState.DestinationBlend, Blend.InverseSourceAlpha);
+                device.SetRenderState(RenderState.BlendOperationAlpha, BlendOperation.Add);
                 device.VertexFormat = CustomVertex.TransformedColored.Format;
 
-                device.SetStreamSource(0, vertexBuffer, 0);
+                device.SetStreamSource(0, vertexBuffer, 0, 0);
             }
 
             device.DrawPrimitives(PrimitiveType.TriangleStrip, 0, 2);
-            infoHUD.DrawText(null, text, new Point(x + 8, y + 8), Color.White);
+            infoHUD.DrawText(null, text, x + 8, y + 8, new RawColorBGRA(0xFF, 0xFF, 0xFF, 0xFF));
         }
 
         /// <summary>
@@ -1224,8 +1254,8 @@ namespace Ohana3DS_Rebirth.Ohana
         /// </summary>
         public void resetCamera()
         {
-            translation = Vector2.Empty;
-            rotation = Vector2.Empty;
+            translation = Vector2.Zero;
+            rotation = Vector2.Zero;
             zoom = 0;
 
             render();
@@ -1370,19 +1400,19 @@ namespace Ohana3DS_Rebirth.Ohana
         {
             switch (function)
             {
-                case RenderBase.OBlendFunction.constantAlpha: return Blend.BothSourceAlpha;
+                case RenderBase.OBlendFunction.constantAlpha: return Blend.Bothsrcalpha;
                 case RenderBase.OBlendFunction.constantColor: return Blend.BlendFactor;
                 case RenderBase.OBlendFunction.destinationAlpha: return Blend.DestinationAlpha;
                 case RenderBase.OBlendFunction.destinationColor: return Blend.DestinationColor;
                 case RenderBase.OBlendFunction.one: return Blend.One;
-                case RenderBase.OBlendFunction.oneMinusConstantAlpha: return Blend.BothInvSourceAlpha;
-                case RenderBase.OBlendFunction.oneMinusConstantColor: return Blend.InvBlendFactor;
-                case RenderBase.OBlendFunction.oneMinusDestinationAlpha: return Blend.InvDestinationAlpha;
-                case RenderBase.OBlendFunction.oneMinusDestinationColor: return Blend.InvDestinationColor;
-                case RenderBase.OBlendFunction.oneMinusSourceAlpha: return Blend.InvSourceAlpha;
-                case RenderBase.OBlendFunction.oneMinusSourceColor: return Blend.InvSourceColor;
+                case RenderBase.OBlendFunction.oneMinusConstantAlpha: return Blend.BothInverseSourceAlpha;
+                case RenderBase.OBlendFunction.oneMinusConstantColor: return Blend.InverseBlendFactor;
+                case RenderBase.OBlendFunction.oneMinusDestinationAlpha: return Blend.InverseDestinationAlpha;
+                case RenderBase.OBlendFunction.oneMinusDestinationColor: return Blend.InverseDestinationColor;
+                case RenderBase.OBlendFunction.oneMinusSourceAlpha: return Blend.InverseSourceAlpha;
+                case RenderBase.OBlendFunction.oneMinusSourceColor: return Blend.InverseSourceColor;
                 case RenderBase.OBlendFunction.sourceAlpha: return Blend.SourceAlpha;
-                case RenderBase.OBlendFunction.sourceAlphaSaturate: return Blend.SourceAlphaSat;
+                case RenderBase.OBlendFunction.sourceAlphaSaturate: return Blend.SourceAlphaSaturated;
                 case RenderBase.OBlendFunction.sourceColor: return Blend.SourceColor;
                 case RenderBase.OBlendFunction.zero: return Blend.Zero;
             }
@@ -1400,9 +1430,9 @@ namespace Ohana3DS_Rebirth.Ohana
             switch (equation)
             {
                 case RenderBase.OBlendEquation.add: return BlendOperation.Add;
-                case RenderBase.OBlendEquation.max: return BlendOperation.Max;
-                case RenderBase.OBlendEquation.min: return BlendOperation.Min;
-                case RenderBase.OBlendEquation.reverseSubtract: return BlendOperation.RevSubtract;
+                case RenderBase.OBlendEquation.max: return BlendOperation.Maximum;
+                case RenderBase.OBlendEquation.min: return BlendOperation.Minimum;
+                case RenderBase.OBlendEquation.reverseSubtract: return BlendOperation.ReverseSubtract;
                 case RenderBase.OBlendEquation.subtract: return BlendOperation.Subtract;
             }
 
@@ -1419,9 +1449,9 @@ namespace Ohana3DS_Rebirth.Ohana
             switch (operation)
             {
                 case RenderBase.OStencilOp.decrease: return StencilOperation.Decrement;
-                case RenderBase.OStencilOp.decreaseWrap: return StencilOperation.DecrementSaturation;
+                case RenderBase.OStencilOp.decreaseWrap: return StencilOperation.DecrementSaturate;
                 case RenderBase.OStencilOp.increase: return StencilOperation.Increment;
-                case RenderBase.OStencilOp.increaseWrap: return StencilOperation.IncrementSaturation;
+                case RenderBase.OStencilOp.increaseWrap: return StencilOperation.IncrementSaturate;
                 case RenderBase.OStencilOp.keep: return StencilOperation.Keep;
                 case RenderBase.OStencilOp.replace: return StencilOperation.Replace;
                 case RenderBase.OStencilOp.zero: return StencilOperation.Zero;
@@ -1435,7 +1465,7 @@ namespace Ohana3DS_Rebirth.Ohana
         /// </summary>
         /// <param name="input">The color to be converted</param>
         /// <returns></returns>
-        private Vector4 getColor(Color input)
+        private Vector4 getColor(System.Drawing.Color input)
         {
             return new Vector4((float)input.R / 0xff, (float)input.G / 0xff, (float)input.B / 0xff, (float)input.A / 0xff);
         }
@@ -1464,7 +1494,7 @@ namespace Ohana3DS_Rebirth.Ohana
         /// </summary>
         /// <param name="data">The animation data</param>
         /// <param name="color">The color where the animation will be applied</param>
-        private void getMaterialAnimationColor(RenderBase.OMaterialAnimationData data, ref Color color)
+        private void getMaterialAnimationColor(RenderBase.OMaterialAnimationData data, ref System.Drawing.Color color)
         {
             float r = AnimationUtils.getKey(data.frameList[0], ctrlMA.Frame);
             float g = AnimationUtils.getKey(data.frameList[1], ctrlMA.Frame);
@@ -1476,7 +1506,7 @@ namespace Ohana3DS_Rebirth.Ohana
             byte B = data.frameList[2].exists ? (byte)(b * 0xff) : color.B;
             byte A = data.frameList[3].exists ? (byte)(a * 0xff) : color.A;
 
-            color = Color.FromArgb(A, R, G, B);
+            color = System.Drawing.Color.FromArgb(A, R, G, B);
         }
 
         /// <summary>

@@ -158,3 +158,4 @@ $RECYCLE.BIN/
 .DS_Store
 .vs/slnx.sqlite
 *.sqlite
+/packages
