@@ -10,6 +10,7 @@ using SharpDX.Direct3D9;
 using SharpDX.Mathematics.Interop;
 using Color = SharpDX.Color;
 using Ohana3DS_Rebirth.Properties;
+using System.IO;
 
 namespace Ohana3DS_Rebirth.Ohana
 {
@@ -311,7 +312,7 @@ namespace Ohana3DS_Rebirth.Ohana
                         new Vertex() { Color = lColor, Position = new Vector4(-50f, 0, i, 1.0f)},
                         new Vertex() { Color = lColor, Position = new Vector4(50f, 0, i, 1.0f)},
                         new Vertex() { Color = lColor, Position = new Vector4(i, 0, -50f, 1.0f)},
-                        new Vertex() { Color = lColor, Position = new Vector4(i, 0, 50f, 1.0f)},
+                        new Vertex() { Color = lColor, Position = new Vector4(i, 0, 50f, 1.0f)}
                     });
                 }
             }
@@ -323,7 +324,7 @@ namespace Ohana3DS_Rebirth.Ohana
                 new Vertex() { Color = Color.Green, Position = new Vector4(0, 0, 0, 1.0f) },
                 new Vertex() { Color = Color.Green, Position = new Vector4(0, 5f, 0, 1.0f) },
                 new Vertex() { Color = Color.Blue, Position = new Vector4(0, 0, 0, 1.0f) },
-                new Vertex() { Color = Color.Blue, Position = new Vector4(0, 0, -5f, 1.0f) },
+                new Vertex() { Color = Color.Blue, Position = new Vector4(0, 0, -5f, 1.0f) }
             });
             #endregion
 
@@ -470,7 +471,12 @@ namespace Ohana3DS_Rebirth.Ohana
             tex.name = texture.name;
             Bitmap bmp = new Bitmap(texture.texture);
             bmp.RotateFlip(RotateFlipType.RotateNoneFlipY);
-            tex.texture = new Texture(device, bmp, Usage.None, Pool.Managed);
+            using(MemoryStream ms = new MemoryStream())
+            {
+                bmp.Save(ms, System.Drawing.Imaging.ImageFormat.MemoryBmp);
+                tex.texture = Texture.FromMemory(device, ms.GetBuffer());
+            }
+            //tex.texture = new Texture(device, bmp, , Usage.None, SharpDX.DXGI.Format.R8G8B8A8_UNorm_SRgb, Pool.Managed);
             tex.width = bmp.Width;
             tex.height = bmp.Height;
             textures.Add(tex);
@@ -784,11 +790,11 @@ namespace Ohana3DS_Rebirth.Ohana
 
                     #region "Material Animation"
                     int[] textureId = { -1, -1, -1 };
-                    Color blendColor = FromDrawingColor(material.fragmentOperation.blend.blendColor);
+                    Color blendColor = material.fragmentOperation.blend.blendColor;
                     Color[] borderColor = new Color[3];
-                    borderColor[0] = FromDrawingColor(material.textureMapper[0].borderColor);
-                    borderColor[1] = FromDrawingColor(material.textureMapper[1].borderColor);
-                    borderColor[2] = FromDrawingColor(material.textureMapper[2].borderColor);
+                    borderColor[0] = material.textureMapper[0].borderColor;
+                    borderColor[1] = material.textureMapper[1].borderColor;
+                    borderColor[2] = material.textureMapper[2].borderColor;
                     if (ctrlMA.animate)
                     {
                         foreach (RenderBase.OMaterialAnimationData data in ((RenderBase.OMaterialAnimation)models.materialAnimation.list[ctrlMA.CurrentAnimation]).data)
@@ -851,10 +857,10 @@ namespace Ohana3DS_Rebirth.Ohana
                         fragmentShader.SetValue("bumpIndex", (int)material.fragmentShader.bump.texture);
                         fragmentShader.SetValue("bumpMode", (int)material.fragmentShader.bump.mode);
 
-                        fragmentShader.SetValue("mEmissive", getColor(materialColor.emission));
-                        fragmentShader.SetValue("mAmbient", getColor(materialColor.ambient));
-                        fragmentShader.SetValue("mDiffuse", getColor(materialColor.diffuse));
-                        fragmentShader.SetValue("mSpecular", getColor(materialColor.specular0));
+                        fragmentShader.SetValue("mEmissive", materialColor.emission.ToVector4());
+                        fragmentShader.SetValue("mAmbient", materialColor.ambient.ToVector4());
+                        fragmentShader.SetValue("mDiffuse", materialColor.diffuse.ToVector4());
+                        fragmentShader.SetValue("mSpecular", materialColor.specular0.ToVector4());
 
                         fragmentShader.SetValue("hasNormal", obj.hasNormal);
 
@@ -1012,7 +1018,7 @@ namespace Ohana3DS_Rebirth.Ohana
                         }
 
                         //Addressing
-                        device.SetSamplerState(s, SamplerState.BorderColor, borderColor[s].ToArgb());
+                        device.SetSamplerState(s, SamplerState.BorderColor, borderColor[s].ToBgra());
                         switch (material.textureMapper[s].wrapU)
                         {
                             case RenderBase.OTextureWrap.repeat: device.SetSamplerState(s, SamplerState.AddressU, (int)TextureAddress.Wrap); break;
@@ -1034,44 +1040,44 @@ namespace Ohana3DS_Rebirth.Ohana
                     //Culling
                     switch (material.rasterization.cullMode)
                     {
-                        case RenderBase.OCullMode.backFace: device.RenderState.CullMode = Cull.Clockwise; break;
-                        case RenderBase.OCullMode.frontFace: device.RenderState.CullMode = Cull.CounterClockwise; break;
-                        case RenderBase.OCullMode.never: device.RenderState.CullMode = Cull.None; break;
+                        case RenderBase.OCullMode.backFace: device.SetRenderState(RenderState.CullMode, Cull.Clockwise); break;
+                        case RenderBase.OCullMode.frontFace: device.SetRenderState(RenderState.CullMode, Cull.Counterclockwise); break;
+                        case RenderBase.OCullMode.never: device.SetRenderState(RenderState.CullMode, Cull.None); break;
                     }
 
                     //Alpha testing
                     RenderBase.OAlphaTest alpha = material.fragmentShader.alphaTest;
-                    device.RenderState.AlphaTestEnable = alpha.isTestEnabled;
-                    device.RenderState.AlphaFunction = getCompare(alpha.testFunction);
-                    device.RenderState.ReferenceAlpha = (int)alpha.testReference;
+                    device.SetRenderState(RenderState.AlphaTestEnable, alpha.isTestEnabled);
+                    device.SetRenderState(RenderState.AlphaFunc, getCompare(alpha.testFunction));
+                    device.SetRenderState(RenderState.AlphaRef, (int)alpha.testReference);
 
                     //Depth testing
                     RenderBase.ODepthOperation depth = material.fragmentOperation.depth;
-                    device.RenderState.ZBufferEnable = depth.isTestEnabled;
-                    device.RenderState.ZBufferFunction = getCompare(depth.testFunction);
-                    device.RenderState.ZBufferWriteEnable = depth.isMaskEnabled;
+                    device.SetRenderState(RenderState.ZEnable, depth.isTestEnabled);
+                    device.SetRenderState(RenderState.ZFunc, getCompare(depth.testFunction));
+                    device.SetRenderState(RenderState.ZWriteEnable, depth.isMaskEnabled);
 
                     //Alpha blending
                     RenderBase.OBlendOperation blend = material.fragmentOperation.blend;
-                    device.RenderState.AlphaBlendEnable = blend.mode == RenderBase.OBlendMode.blend;
-                    device.RenderState.SeparateAlphaBlendEnabled = true;
-                    device.RenderState.SourceBlend = getBlend(blend.rgbFunctionSource);
-                    device.RenderState.DestinationBlend = getBlend(blend.rgbFunctionDestination);
-                    device.RenderState.BlendOperation = getBlendOperation(blend.rgbBlendEquation);
-                    device.RenderState.AlphaSourceBlend = getBlend(blend.alphaFunctionSource);
-                    device.RenderState.AlphaDestinationBlend = getBlend(blend.alphaFunctionDestination);
-                    device.RenderState.AlphaBlendOperation = getBlendOperation(blend.alphaBlendEquation);
-                    device.RenderState.BlendFactorColor = blendColor.ToArgb();
+                    device.SetRenderState(RenderState.AlphaBlendEnable, blend.mode == RenderBase.OBlendMode.blend);
+                    device.SetRenderState(RenderState.SeparateAlphaBlendEnable, true);
+                    device.SetRenderState(RenderState.SourceBlend, getBlend(blend.rgbFunctionSource));
+                    device.SetRenderState(RenderState.DestinationBlend, getBlend(blend.rgbFunctionDestination));
+                    device.SetRenderState(RenderState.BlendOperation, getBlendOperation(blend.rgbBlendEquation));
+                    device.SetRenderState(RenderState.SourceBlendAlpha, getBlend(blend.alphaFunctionSource));
+                    device.SetRenderState(RenderState.DestinationBlendAlpha, getBlend(blend.alphaFunctionDestination));
+                    device.SetRenderState(RenderState.BlendOperationAlpha, getBlendOperation(blend.alphaBlendEquation));
+                    device.SetRenderState(RenderState.BlendFactor, blendColor.ToBgra());
 
                     //Stencil testing
                     RenderBase.OStencilOperation stencil = material.fragmentOperation.stencil;
-                    device.RenderState.StencilEnable = stencil.isTestEnabled;
-                    device.RenderState.StencilFunction = getCompare(stencil.testFunction);
-                    device.RenderState.ReferenceStencil = (int)stencil.testReference;
-                    device.RenderState.StencilWriteMask = (int)stencil.testMask;
-                    device.RenderState.StencilFail = getStencilOperation(stencil.failOperation);
-                    device.RenderState.StencilZBufferFail = getStencilOperation(stencil.zFailOperation);
-                    device.RenderState.StencilPass = getStencilOperation(stencil.passOperation);
+                    device.SetRenderState(RenderState.StencilEnable, stencil.isTestEnabled);
+                    device.SetRenderState(RenderState.StencilFunc, getCompare(stencil.testFunction));
+                    device.SetRenderState(RenderState.StencilRef, (int)stencil.testReference);
+                    device.SetRenderState(RenderState.StencilWriteMask, (int)stencil.testMask);
+                    device.SetRenderState(RenderState.StencilFail, getStencilOperation(stencil.failOperation));
+                    device.SetRenderState(RenderState.StencilZFail, getStencilOperation(stencil.zFailOperation));
+                    device.SetRenderState(RenderState.StencilPass, getStencilOperation(stencil.passOperation));
                     #endregion
 
                     #region "Rendering"
@@ -1113,13 +1119,11 @@ namespace Ohana3DS_Rebirth.Ohana
                             }
                         }
 
-                        using (VertexBuffer vertexBuffer = new VertexBuffer(typeof(customVertex), buffer.Length, device, Usage.None, vertexFormat, Pool.Managed))
-                        {
-                            vertexBuffer.(buffer, 0, LockFlags.None);
-                            device.SetStreamSource(0, vertexBuffer, 0, 0);
-
-                            device.DrawPrimitives(PrimitiveType.TriangleList, 0, buffer.Length / 3);
-                        }
+                        VertexBuffer vertexBuffer = new VertexBuffer(device, buffer.Length, Usage.None, vertexFormat, Pool.Managed);
+                        vertexBuffer.Lock(0, 0, LockFlags.None).WriteRange(gridBuffer.ToArray());
+                        vertexBuffer.Unlock();
+                        device.SetStreamSource(0, vertexBuffer, 0, 0);
+                        device.DrawPrimitives(PrimitiveType.TriangleList, 0, buffer.Length / 3);
                     }
 
                     if (Properties.Settings.Default.reFragmentShader) fragmentShader.EndPass();
@@ -1183,27 +1187,30 @@ namespace Ohana3DS_Rebirth.Ohana
         {
             int x = 16;
             int y = 16;
-            int c = 0x7f000000;
+            //int c = 0x7f000000;
+            Color color = new Color(128, 0, 0, 0);
 
-            CustomVertex.TransformedColored[] boxBuffer = new CustomVertex.TransformedColored[4];
-            boxBuffer[0] = new CustomVertex.TransformedColored(x, y, 0, 1, c);
-            boxBuffer[1] = new CustomVertex.TransformedColored(x + width, y, 0, 1, c);
-            boxBuffer[2] = new CustomVertex.TransformedColored(x, y + height, 0, 1, c);
-            boxBuffer[3] = new CustomVertex.TransformedColored(x + width, y + height, 0, 1, c);
-
-            using (VertexBuffer vertexBuffer = new VertexBuffer(typeof(CustomVertex.TransformedColored), 4, device, Usage.None, CustomVertex.TransformedColored.Format, Pool.Managed))
+            List<Vertex> boxBuffer = new List<Vertex>
             {
-                vertexBuffer.SetData(boxBuffer, 0, LockFlags.None);
+                new Vertex() { Color = color, Position = new Vector4(x, y, 0, 1) },
+                new Vertex() { Color = color, Position = new Vector4(x + width, y, 0, 1) },
+                new Vertex() { Color = color, Position = new Vector4(x, y + height, 0, 1) },
+                new Vertex() { Color = color, Position = new Vector4(x + width, y + height, 0, 1) }
+            };
 
-                device.SetTexture(0, null);
-                device.SetRenderState(RenderState.AlphaBlendEnable, true);
-                device.SetRenderState(RenderState.SourceBlend, Blend.SourceAlpha);
-                device.SetRenderState(RenderState.DestinationBlend, Blend.InverseSourceAlpha);
-                device.SetRenderState(RenderState.BlendOperationAlpha, BlendOperation.Add);
-                device.VertexFormat = CustomVertex.TransformedColored.Format;
+            VertexBuffer vertexBuffer = new VertexBuffer(device, 4, Usage.None, VertexFormat.None, Pool.Managed);
+            vertexBuffer.Lock(0, 0, LockFlags.None).WriteRange(boxBuffer.ToArray());
+            vertexBuffer.Unlock();
+            
+            device.SetTexture(0, null);
+            device.SetRenderState(RenderState.AlphaBlendEnable, true);
+            device.SetRenderState(RenderState.SourceBlend, Blend.SourceAlpha);
+            device.SetRenderState(RenderState.DestinationBlend, Blend.InverseSourceAlpha);
+            device.SetRenderState(RenderState.BlendOperationAlpha, BlendOperation.Add);
+            device.VertexFormat = VertexFormat.None;
 
-                device.SetStreamSource(0, vertexBuffer, 0, 0);
-            }
+
+            device.SetStreamSource(0, vertexBuffer, 0, 0);
 
             device.DrawPrimitives(PrimitiveType.TriangleStrip, 0, 2);
             infoHUD.DrawText(null, text, x + 8, y + 8, new RawColorBGRA(0xFF, 0xFF, 0xFF, 0xFF));
@@ -1494,7 +1501,7 @@ namespace Ohana3DS_Rebirth.Ohana
         /// </summary>
         /// <param name="data">The animation data</param>
         /// <param name="color">The color where the animation will be applied</param>
-        private void getMaterialAnimationColor(RenderBase.OMaterialAnimationData data, ref System.Drawing.Color color)
+        private void getMaterialAnimationColor(RenderBase.OMaterialAnimationData data, ref Color color)
         {
             float r = AnimationUtils.getKey(data.frameList[0], ctrlMA.Frame);
             float g = AnimationUtils.getKey(data.frameList[1], ctrlMA.Frame);
@@ -1506,7 +1513,7 @@ namespace Ohana3DS_Rebirth.Ohana
             byte B = data.frameList[2].exists ? (byte)(b * 0xff) : color.B;
             byte A = data.frameList[3].exists ? (byte)(a * 0xff) : color.A;
 
-            color = System.Drawing.Color.FromArgb(A, R, G, B);
+            color = new Color(R, G, B, A);
         }
 
         /// <summary>
